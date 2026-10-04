@@ -30,15 +30,19 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # 4. Install Dependencies
+      # 4. Generate Missing Android Files (Fixes build.gradle error)
+      - name: Generate Android Files
+        run: flutter create --platforms=android .
+
+      # 5. Install Dependencies
       - name: Get Flutter Packages
         run: flutter pub get
 
-      # 5. Build Release APK
+      # 6. Build Release APK
       - name: Build APK
         run: flutter build apk --release
 
-      # 6. Upload APK Artifact
+      # 7. Upload APK Artifact
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
