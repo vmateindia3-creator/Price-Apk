@@ -1,0 +1,27 @@
+name: Daily Live Fuel Rate Updater
+
+on:
+  schedule:
+    - cron: '30 0 * * *' # Subah 6:00 AM IST
+  workflow_dispatch: # Manual trigger button
+
+jobs:
+  update-fuel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests beautifulsoup4 firebase-admin
+
+      - name: Run Fuel Scraper
+        env:
+          FIREBASE_KEY_JSON: ${{ secrets.FIREBASE_KEY_JSON }}
+        run: python scraper.py
