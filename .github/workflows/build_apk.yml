@@ -24,14 +24,20 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Force Re-create Android Platform Files
+      - name: Generate Complete Android Platform Structure
         run: |
           rm -rf android
-          flutter create --platforms=android .
+          flutter create --platforms=android --org com.example .
 
-      - name: Set minSdkVersion 21
+      - name: Configure Minimum SDK 21
         run: |
           sed -i 's/minSdkVersion.*/minSdkVersion 21/' android/app/build.gradle
+
+      - name: Restore Google Services Config
+        run: |
+          if [ -f "google-services.json" ]; then
+            cp google-services.json android/app/
+          fi
 
       - name: Get Dependencies
         run: flutter pub get
