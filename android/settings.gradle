@@ -1,0 +1,65 @@
+buildscript {
+    ext.kotlin_version = '1.8.22'
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.3.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath 'com.google.gms:google-services:4.3.15' // Firebase support
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+Option 2 bilkul try kar sakte hain, par dhyan rakhein ki sirf `settings.gradle` file banane se kaam adhoora reh jayega. 
+
+Jab Flutter bolta hai ki *"unsupported Gradle project"*, toh uska matlab hai ki root `android` folder ke andar do main files missing hain:
+1. `android/settings.gradle`
+2. `android/build.gradle` (ye root level wali file hai, na ki `android/app/build.gradle`)
+
+Agar aap Option 2 chun rahe hain, toh aapko **dono files** manually banani hongi:
+
+---
+
+### Step 1: `android/settings.gradle` File Banayein
+
+1. GitHub par **`android/`** folder me jayein.
+2. **Add file** > **Create new file** par click karein.
+3. File Path/Name likhein: `settings.gradle`
+4. Niche diya gaya code paste karke **Commit** karein:
+
+```groovy
+pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        def file = new File(rootDir, "local.properties")
+        if (file.exists()) {
+            file.withReader('UTF-8') { reader -> properties.load(reader) }
+        }
+        def sdkPath = properties.getProperty("flutter.sdk")
+        assert sdkPath != null : "flutter.sdk not set in local.properties"
+        return sdkPath
+    }()
+
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
+
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0"
+    id "com.android.application" version "7.3.0" apply false
+    id "org.jetbrains.kotlin.android" version "1.7.10" apply false
+    id "com.google.gms.google-services" version "4.3.15" apply false
+}
+
+include ":app"
+      
