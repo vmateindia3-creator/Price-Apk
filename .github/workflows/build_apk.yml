@@ -1,90 +1,44 @@
-name: Build Flutter APK
+name: Build Android Release APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v3
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.x'
+          channel: 'stable'
 
-      # 1. Create Android Platform Code
-      - name: Create Android Platform Code
-        run: flutter create . --platforms=android --project-name fuel_weather_app
+      - name: Auto Fix Android Project Structure
+        run: flutter create --platforms=android .
 
-      # 2. Upgrade Kotlin Version cleanly to 1.9.20
-      - name: Upgrade Kotlin Version
+      - name: Apply Minimum SDK 21 Fix
         run: |
-          if [ -f android/build.gradle ]; then
-            sed -i -E 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.20"/g' android/build.gradle
-          fi
-          if [ -f android/settings.gradle ]; then
-            sed -i -E 's/id "org.jetbrains.kotlin.android" version "[^"]+"/id "org.jetbrains.kotlin.android" version "1.9.20"/g' android/settings.gradle
-            sed -i -E "s/id 'org.jetbrains.kotlin.android' version '[^']+'/id 'org.jetbrains.kotlin.android' version '1.9.20'/g" android/settings.gradle
-          fi
+          sed -i 's/minSdkVersion.*/minSdkVersion 21/' android/app/build.gradle
 
-      # 3. Inject AndroidManifest with Valid Config Changes & Permissions
-      - name: Inject Permissions
-        run: |
-          mkdir -p android/app/src/main
-          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
-              <application
-                  android:label="fuel_weather_app"
-                  android:name="${applicationName}"
-                  android:icon="@mipmap/ic_launcher">
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:launchMode="singleTop"
-                      android:taskAffinity=""
-                      android:theme="@style/LaunchTheme"
-                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-                      android:hardwareAccelerated="true"
-                      android:windowSoftInputMode="adjustResize">
-                      <meta-data
-                        android:name="io.flutter.embedding.android.NormalTheme"
-                        android:resource="@style/NormalTheme"
-                        />
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
-                  <meta-data
-                      android:name="flutterEmbedding"
-                      android:value="2" />
-              </application>
-          </manifest>
-          EOF
-
-      - name: Install Dependencies
+      - name: Get Flutter Dependencies
         run: flutter pub get
 
       - name: Build Release APK
         run: flutter build apk --release
 
-      - name: Upload Release APK
-        uses: actions/upload-artifact@v4
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v3
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
