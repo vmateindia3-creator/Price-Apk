@@ -24,14 +24,16 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Auto Fix Android Project Structure
-        run: flutter create --platforms=android .
+      - name: Force Re-create Android Platform Files
+        run: |
+          rm -rf android
+          flutter create --platforms=android .
 
-      - name: Apply Minimum SDK 21 Fix
+      - name: Set minSdkVersion 21
         run: |
           sed -i 's/minSdkVersion.*/minSdkVersion 21/' android/app/build.gradle
 
-      - name: Get Flutter Dependencies
+      - name: Get Dependencies
         run: flutter pub get
 
       - name: Build Release APK
