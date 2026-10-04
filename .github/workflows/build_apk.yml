@@ -24,14 +24,8 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Generate Complete Android Platform Structure
-        run: |
-          rm -rf android
-          flutter create --platforms=android --org com.example .
-
-      - name: Configure Minimum SDK 21
-        run: |
-          sed -i 's/minSdkVersion.*/minSdkVersion 21/' android/app/build.gradle
+      - name: Generate Android Platform Files
+        run: flutter create --platforms=android .
 
       - name: Restore Google Services Config
         run: |
@@ -43,7 +37,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --min-sdk=21
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
