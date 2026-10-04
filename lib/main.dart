@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// 1. Modern Dart 3 Strongly-Typed Data Model
+// 1. Strongly-Typed Data Model
 final class CityData {
   final String temperature;
   final String condition;
@@ -61,7 +61,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
   bool isLoading = false;
   double fuelAmountInput = 500;
 
-  // 2. Immutable City Data Store with Dynamic Background Gradients
+  // 2. Dynamic City & Weather Data Store
   static const Map<String, CityData> cityDataMap = {
     'Delhi': CityData(
       temperature: '32°C',
@@ -70,7 +70,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
       petrol: 96.72,
       diesel: 89.62,
       cng: 75.59,
-      bgGradient: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)], // Sunny Mint Tint
+      bgGradient: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)],
       weatherIcon: Icons.wb_sunny_rounded,
     ),
     'Mumbai': CityData(
@@ -80,7 +80,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
       petrol: 104.21,
       diesel: 92.15,
       cng: 76.00,
-      bgGradient: [Color(0xFFE0F7FA), Color(0xFFB2EBF2)], // Oceanic Aqua
+      bgGradient: [Color(0xFFE0F7FA), Color(0xFFB2EBF2)],
       weatherIcon: Icons.water_drop_rounded,
     ),
     'Lucknow': CityData(
@@ -90,7 +90,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
       petrol: 96.57,
       diesel: 89.76,
       cng: 82.50,
-      bgGradient: [Color(0xFFECEFF1), Color(0xFFCFD8DC)], // Slate Cloud
+      bgGradient: [Color(0xFFECEFF1), Color(0xFFCFD8DC)],
       weatherIcon: Icons.wb_cloudy_rounded,
     ),
     'Kanpur': CityData(
@@ -100,7 +100,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
       petrol: 96.63,
       diesel: 89.81,
       cng: 82.50,
-      bgGradient: [Color(0xFFFFF8E1), Color(0xFFFFECB3)], // Soft Amber Glow
+      bgGradient: [Color(0xFFFFF8E1), Color(0xFFFFECB3)],
       weatherIcon: Icons.wb_twilight_rounded,
     ),
   };
@@ -115,7 +115,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
           backgroundColor: const Color(0xFF008069),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          content: Text('$selectedCity ka current rate & weather sync ho gaya!'),
+          content: Text('$selectedCity ka rate & weather sync ho gaya!'),
         ),
       );
     }
@@ -160,7 +160,6 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
           ),
         ],
       ),
-      // Dynamic Background Transition Wrapper
       body: AnimatedContainer(
         duration: const Duration(milliseconds: 500),
         decoration: BoxDecoration(
@@ -172,7 +171,6 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
         ),
         child: SafeArea(
           child: Center(
-            // Responsive Constraint for Mobile, Tablet & Desktop Screens
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 600),
               child: ListView(
@@ -222,7 +220,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
                   ),
                   const SizedBox(height: 14),
 
-                  // 2. Weather Highlight Banner (Dark Emerald WhatsApp Message Design)
+                  // 2. Weather Highlight Card
                   Card(
                     elevation: 2,
                     color: const Color(0xFF075E54),
@@ -257,7 +255,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
                               ),
                               Text(
                                 '${data.condition}  |  Humidity: ${data.humidity}',
-                                style: const TextStyle(color: Colors.white82, fontSize: 13),
+                                style: const TextStyle(color: Colors.white70, fontSize: 13),
                               ),
                             ],
                           ),
@@ -270,6 +268,113 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
 
                   // 3. Fuel Rates Tiles
                   const Padding(
+                    padding: EdgeInsets.only(left: 4, bottom: 8),
+                    child: Text(
+                      'Today Fuel Rates',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF121B22)),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(child: _buildFuelTile('Petrol', '₹${data.petrol.toStringAsFixed(2)}', '/Ltr', const Color(0xFFE65100))),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildFuelTile('Diesel', '₹${data.diesel.toStringAsFixed(2)}', '/Ltr', const Color(0xFF37474F))),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildFuelTile('CNG', '₹${data.cng.toStringAsFixed(2)}', '/Kg', const Color(0xFF2E7D32))),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 4. Interactive Calculator Card
+                  Card(
+                    elevation: 1.5,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.calculate_outlined, color: Color(0xFF008069)),
+                              SizedBox(width: 8),
+                              Text(
+                                'Quick Fuel Estimator',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Budget Amount:', style: TextStyle(color: Colors.black87)),
+                              Text(
+                                '₹${fuelAmountInput.toInt()}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF008069)),
+                              ),
+                            ],
+                          ),
+                          Slider(
+                            value: fuelAmountInput,
+                            min: 100,
+                            max: 3000,
+                            divisions: 29,
+                            activeColor: const Color(0xFF008069),
+                            inactiveColor: const Color(0xFFE0E0E0),
+                            label: '₹${fuelAmountInput.toInt()}',
+                            onChanged: (val) => setState(() => fuelAmountInput = val),
+                          ),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE7FCE3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFB9F6CA)),
+                            ),
+                            child: Text(
+                              '₹${fuelAmountInput.toInt()} me $selectedCity me approx $liters Ltr Petrol aayega.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFF075E54),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFuelTile(String title, String price, String unit, Color accentColor) {
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        child: Column(
+          children: [
+            Text(title, style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 6),
+            Text(price, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(unit, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+                const Padding(
                     padding: EdgeInsets.only(left: 4, bottom: 8),
                     child: Text(
                       'Today Fuel Rates',
