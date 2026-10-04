@@ -1,0 +1,46 @@
+name: Build Release APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Repo Code Fetch
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Java 17 JDK
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # 3. Setup Flutter SDK
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      # 4. Install Dependencies
+      - name: Get Flutter Packages
+        run: flutter pub get
+
+      # 5. Build Release APK
+      - name: Build APK
+        run: flutter build apk --release
+
+      # 6. Upload APK Artifact
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FuelWeather-Release-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
