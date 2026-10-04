@@ -43,7 +43,8 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
   final TextEditingController _searchController = TextEditingController();
 
   String selectedCity = 'Delhi';
-  String temperature = '32°C';
+  double rawTemp = 27.0; // Default temperature
+  String temperature = '27°C';
   String condition = 'Clear Sky';
   String humidity = '55%';
   String windSpeed = '3.5 m/s';
@@ -52,7 +53,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
   bool isLoading = false;
   double fuelAmountInput = 500;
 
-  // Reference Fuel Rates Data (Fallback by City)
+  // Reference Fuel Rates Data
   final Map<String, Map<String, double>> fuelRates = {
     'Delhi': {'petrol': 96.72, 'diesel': 89.62, 'cng': 75.59},
     'Mumbai': {'petrol': 104.21, 'diesel': 92.15, 'cng': 76.00},
@@ -64,6 +65,21 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
   void initState() {
     super.initState();
     fetchWeatherByCity(selectedCity);
+  }
+
+  // Calculate Background Color based on Temperature (0°C = Black, 42°C+ = White)
+  Color _getTempBackgroundColor(double temp) {
+    if (temp <= 5) return const Color(0xFF101418); // Dark Black/Navy
+    if (temp >= 42) return const Color(0xFFF8F9FA); // Pure White/Off-White
+
+    // Interpolate smoothly between Dark (5°C) and White (42°C)
+    double t = ((temp - 5) / 37.0).clamp(0.0, 1.0);
+    return Color.lerp(const Color(0xFF1C232A), const Color(0xFFF5F5F5), t)!;
+  }
+
+  // Check if background is dark to adjust text contrast
+  bool _isDarkBackground(Color color) {
+    return ThemeData.estimateBrightnessForColor(color) == Brightness.dark;
   }
 
   // 1. Fetch Weather by City Name
@@ -146,25 +162,30 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
     setState(() {
       selectedCity = data['name'] ?? 'Unknown';
       _searchController.text = selectedCity;
-      temperature = '${(data['main']['temp'] as num).round()}°C';
+      rawTemp = (data['main']['temp'] as num).toDouble();
+      temperature = '${rawTemp.round()}°C';
       condition = data['weather'][0]['description'].toString().toUpperCase();
       humidity = '${data['main']['humidity']}%';
       windSpeed = '${data['wind']['speed']} m/s';
-      weatherIcon = _getWeatherIcon(data['weather'][0]['main']);
+
+      String rawIconCode = data['weather'][0]['icon'] ?? '';
+      weatherIcon = _getWeatherIcon(data['weather'][0]['main'], rawIconCode);
     });
   }
 
-  IconData _getWeatherIcon(String? mainCondition) {
+  IconData _getWeatherIcon(String? mainCondition, String rawIconCode) {
+    bool isNight = rawIconCode.endsWith('n');
+
     switch (mainCondition?.toLowerCase()) {
       case 'clouds':
-        return Icons.wb_cloudy_rounded;
+        return isNight ? Icons.nights_stay_rounded : Icons.wb_cloudy_rounded;
       case 'rain':
       case 'drizzle':
         return Icons.water_drop_rounded;
       case 'thunderstorm':
         return Icons.thunderstorm_rounded;
       case 'clear':
-        return Icons.wb_sunny_rounded;
+        return isNight ? Icons.nightlight_round : Icons.wb_sunny_rounded;
       case 'snow':
         return Icons.ac_unit_rounded;
       case 'mist':
@@ -172,7 +193,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
       case 'haze':
         return Icons.grain_rounded;
       default:
-        return Icons.wb_twilight_rounded;
+        return isNight ? Icons.nightlight_round : Icons.wb_twilight_rounded;
     }
   }
 
@@ -189,7 +210,11 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    // Lookup fuel rates or fallback to Delhi default rates
+    final bgColor = _getTempBackgroundColor(rawTemp);
+    final isDarkBg = _isDarkBackground(bgColor);
+    final textColor = isDarkBg ? Colors.white : Colors.black87;
+    final cardBgColor = isDarkBg ? const Color(0xFF232D36) : Colors.white;
+
     final currentPetrol = fuelRates[selectedCity]?['petrol'] ?? 96.72;
     final currentDiesel = fuelRates[selectedCity]?['diesel'] ?? 89.62;
     final currentCng = fuelRates[selectedCity]?['cng'] ?? 75.59;
@@ -197,6 +222,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
     final liters = (fuelAmountInput / currentPetrol).toStringAsFixed(2);
 
     return Scaffold(
+      backgroundColor: bgColor,
       appBar: AppBar(
         backgroundColor: const Color(0xFF008069),
         elevation: 2,
@@ -230,190 +256,198 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-              children: [
-                // 1. City Search Bar & GPS Auto Detect Button
-                Card(
-                  elevation: 1.5,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            textInputAction: TextInputAction.search,
-                            decoration: const InputDecoration(
-                              hintText: 'Search city (e.g. Kanpur, Lucknow)...',
-                              border: InputBorder.none,
-                              prefixIcon: Icon(Icons.search_rounded, color: Color(0xFF008069)),
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 600),
+        color: bgColor,
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                children: [
+                  // 1. City Search Bar
+                  Card(
+                    color: cardBgColor,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              style: TextStyle(color: textColor),
+                              textInputAction: TextInputAction.search,
+                              decoration: InputDecoration(
+                                hintText: 'Search city (e.g. Kanpur, Shimla)...',
+                                hintStyle: TextStyle(color: isDarkBg ? Colors.white54 : Colors.grey),
+                                border: InputBorder.none,
+                                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF008069)),
+                              ),
+                              onSubmitted: (val) => fetchWeatherByCity(val),
                             ),
-                            onSubmitted: (val) => fetchWeatherByCity(val),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF008069)),
-                          onPressed: () => fetchWeatherByCity(_searchController.text),
-                        ),
-                        const SizedBox(width: 4),
-                        Tooltip(
-                          message: 'Auto-detect GPS Location',
-                          child: IconButton(
-                            style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFFE8F5E9),
+                          IconButton(
+                            icon: const Icon(Icons.arrow_forward_rounded, color: Color(0xFF008069)),
+                            onPressed: () => fetchWeatherByCity(_searchController.text),
+                          ),
+                          const SizedBox(width: 4),
+                          Tooltip(
+                            message: 'Auto-detect GPS Location',
+                            child: IconButton(
+                              style: IconButton.styleFrom(
+                                backgroundColor: const Color(0xFFE8F5E9),
+                              ),
+                              icon: const Icon(Icons.my_location_rounded, color: Color(0xFF008069)),
+                              onPressed: fetchWeatherByCurrentLocation,
                             ),
-                            icon: const Icon(Icons.my_location_rounded, color: Color(0xFF008069)),
-                            onPressed: fetchWeatherByCurrentLocation,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 14),
+                  const SizedBox(height: 14),
 
-                // 2. Weather Highlight Card
-                Card(
-                  elevation: 2,
-                  color: const Color(0xFF075E54),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                  // 2. Weather Highlight Card
+                  Card(
+                    elevation: 3,
+                    color: const Color(0xFF075E54),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white24,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    'Live Weather • $selectedCity',
+                                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  temperature,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  '$condition  |  Humidity: $humidity',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Wind Speed: $windSpeed',
+                                  style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(weatherIcon, color: const Color(0xFFFFD54F), size: 54),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 3. Fuel Rates Section
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 8),
+                    child: Text(
+                      'Today Fuel Rates',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(child: _buildFuelTile('Petrol', '₹${currentPetrol.toStringAsFixed(2)}', '/Ltr', const Color(0xFFE65100), cardBgColor, textColor)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildFuelTile('Diesel', '₹${currentDiesel.toStringAsFixed(2)}', '/Ltr', isDarkBg ? Colors.lightBlueAccent : const Color(0xFF37474F), cardBgColor, textColor)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildFuelTile('CNG', '₹${currentCng.toStringAsFixed(2)}', '/Kg', const Color(0xFF2E7D32), cardBgColor, textColor)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 4. Quick Fuel Estimator
+                  Card(
+                    color: cardBgColor,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.white24,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  'Live Weather • $selectedCity',
-                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
+                              const Icon(Icons.calculate_outlined, color: Color(0xFF008069)),
+                              const SizedBox(width: 8),
                               Text(
-                                temperature,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 38,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                '$condition  |  Humidity: $humidity',
-                                style: const TextStyle(color: Colors.white70, fontSize: 13),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Wind Speed: $windSpeed',
-                                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                'Quick Fuel Estimator',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor),
                               ),
                             ],
                           ),
-                        ),
-                        Icon(weatherIcon, color: const Color(0xFFFFD54F), size: 54),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // 3. Fuel Rates Section
-                const Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 8),
-                  child: Text(
-                    'Today Fuel Rates',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF121B22)),
-                  ),
-                ),
-                Row(
-                  children: [
-                    Expanded(child: _buildFuelTile('Petrol', '₹${currentPetrol.toStringAsFixed(2)}', '/Ltr', const Color(0xFFE65100))),
-                    const SizedBox(width: 8),
-                    Expanded(child: _buildFuelTile('Diesel', '₹${currentDiesel.toStringAsFixed(2)}', '/Ltr', const Color(0xFF37474F))),
-                    const SizedBox(width: 8),
-                    Expanded(child: _buildFuelTile('CNG', '₹${currentCng.toStringAsFixed(2)}', '/Kg', const Color(0xFF2E7D32))),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // 4. Quick Fuel Estimator
-                Card(
-                  elevation: 1.5,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(Icons.calculate_outlined, color: Color(0xFF008069)),
-                            SizedBox(width: 8),
-                            Text(
-                              'Quick Fuel Estimator',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Budget Amount:', style: TextStyle(color: Colors.black87)),
-                            Text(
-                              '₹${fuelAmountInput.toInt()}',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF008069)),
-                            ),
-                          ],
-                        ),
-                        Slider(
-                          value: fuelAmountInput,
-                          min: 100,
-                          max: 3000,
-                          divisions: 29,
-                          activeColor: const Color(0xFF008069),
-                          inactiveColor: const Color(0xFFE0E0E0),
-                          label: '₹${fuelAmountInput.toInt()}',
-                          onChanged: (val) => setState(() => fuelAmountInput = val),
-                        ),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE7FCE3),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFB9F6CA)),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Budget Amount:', style: TextStyle(color: textColor)),
+                              Text(
+                                '₹${fuelAmountInput.toInt()}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF008069)),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            '₹${fuelAmountInput.toInt()} me $selectedCity me approx $liters Ltr Petrol aayega.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Color(0xFF075E54),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                          Slider(
+                            value: fuelAmountInput,
+                            min: 100,
+                            max: 3000,
+                            divisions: 29,
+                            activeColor: const Color(0xFF008069),
+                            inactiveColor: isDarkBg ? Colors.white24 : const Color(0xFFE0E0E0),
+                            label: '₹${fuelAmountInput.toInt()}',
+                            onChanged: (val) => setState(() => fuelAmountInput = val),
+                          ),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE7FCE3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFB9F6CA)),
+                            ),
+                            child: Text(
+                              '₹${fuelAmountInput.toInt()} me $selectedCity me approx $liters Ltr Petrol aayega.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Color(0xFF075E54),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -421,9 +455,10 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
     );
   }
 
-  Widget _buildFuelTile(String title, String price, String unit, Color accentColor) {
+  Widget _buildFuelTile(String title, String price, String unit, Color accentColor, Color cardBg, Color textColor) {
     return Card(
-      elevation: 1,
+      color: cardBg,
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
@@ -431,7 +466,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
           children: [
             Text(title, style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 13)),
             const SizedBox(height: 6),
-            Text(price, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(price, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
             Text(unit, style: const TextStyle(color: Colors.grey, fontSize: 11)),
           ],
         ),
