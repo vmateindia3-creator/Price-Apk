@@ -37,7 +37,7 @@ class FuelTempApp extends StatelessWidget {
       title: 'Fuel & Weather Live',
       theme: ThemeData(
         useMaterial3: true,
-        primaryColor: const Color(0xFF008069), // WhatsApp Emerald Green
+        primaryColor: const Color(0xFF008069),
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF008069),
           primary: const Color(0xFF008069),
@@ -176,7 +176,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
                 children: [
-                  // 1. WhatsApp-Style City Selector Card
+                  // 1. Select City Card
                   Card(
                     elevation: 1.5,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -266,7 +266,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 3. Fuel Rates Tiles
+                  // 3. Fuel Rates
                   const Padding(
                     padding: EdgeInsets.only(left: 4, bottom: 8),
                     child: Text(
@@ -285,7 +285,7 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 4. Interactive Calculator Card
+                  // 4. Calculator Card
                   Card(
                     elevation: 1.5,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -351,113 +351,6 @@ class _ResponsiveDashboardState extends State<ResponsiveDashboard> {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFuelTile(String title, String price, String unit, Color accentColor) {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        child: Column(
-          children: [
-            Text(title, style: TextStyle(color: accentColor, fontWeight: FontWeight.bold, fontSize: 13)),
-            const SizedBox(height: 6),
-            Text(price, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            Text(unit, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-                const Padding(
-                    padding: EdgeInsets.only(left: 4, bottom: 8),
-                    child: Text(
-                      'Today Fuel Rates',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF121B22)),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(child: _buildFuelTile('Petrol', '₹${data.petrol.toStringAsFixed(2)}', '/Ltr', const Color(0xFFE65100))),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildFuelTile('Diesel', '₹${data.diesel.toStringAsFixed(2)}', '/Ltr', const Color(0xFF37474F))),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildFuelTile('CNG', '₹${data.cng.toStringAsFixed(2)}', '/Kg', const Color(0xFF2E7D32))),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 4. Interactive Calculator Card (WhatsApp Green Chat Bubble Theme)
-                  Card(
-                    elevation: 1.5,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.calculate_outlined, color: Color(0xFF008069)),
-                              SizedBox(width: 8),
-                              Text(
-                                'Quick Fuel Estimator',
-                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Budget Amount:', style: TextStyle(color: Colors.black87)),
-                              Text(
-                                '₹${fuelAmountInput.toInt()}',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF008069)),
-                              ),
-                            ],
-                          ),
-                          Slider(
-                            value: fuelAmountInput,
-                            min: 100,
-                            max: 3000,
-                            divisions: 29,
-                            activeColor: const Color(0xFF008069),
-                            inactiveColor: const Color(0xFFE0E0E0),
-                            label: '₹${fuelAmountInput.toInt()}',
-                            onChanged: (val) => setState(() => fuelAmountInput = val),
-                          ),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE7FCE3), // WhatsApp Light Green Chat Bubble
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFB9F6CA)),
-                            ),
-                            child: Text(
-                              '₹${fuelAmountInput.toInt()} me $selectedCity me approx $liters Ltr Petrol aayega.',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Color(0xFF075E54),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
