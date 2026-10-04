@@ -23,9 +23,9 @@ jobs:
         with:
           flutter-version: '3.19.x'
 
-      # 1. Create Android folder structure if missing
+      # 1. Create Android Platform with explicit valid project name
       - name: Create Android Platform Code
-        run: flutter create . --platforms=android
+        run: flutter create . --platforms=android --project-name fuel_weather_app
 
       # 2. Force Inject Internet & Location Permissions into AndroidManifest
       - name: Inject Permissions
