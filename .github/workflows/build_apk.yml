@@ -27,7 +27,19 @@ jobs:
       - name: Create Android Platform Code
         run: flutter create . --platforms=android --project-name fuel_weather_app
 
-      # 2. Inject Correct AndroidManifest with Valid Config Changes & Permissions
+      # 2. Upgrade Kotlin Version to 1.9.20 to fix dependency errors
+      - name: Upgrade Kotlin Version
+        run: |
+          if [ -f android/build.gradle ]; then
+            sed -i 's/ext.kotlin_version = .*/ext.kotlin_version = "1.9.20"/g' android/build.gradle
+          fi
+          if [ -f android/settings.gradle ]; then
+            sed -i 's/1.7.1/1.9.20/g' android/settings.gradle
+            sed -i 's/1.8.0/1.9.20/g' android/settings.gradle
+            sed -i 's/1.8.22/1.9.20/g' android/settings.gradle
+          fi
+
+      # 3. Inject Correct AndroidManifest with Valid Config Changes & Permissions
       - name: Inject Permissions
         run: |
           mkdir -p android/app/src/main
@@ -77,3 +89,4 @@ jobs:
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          
