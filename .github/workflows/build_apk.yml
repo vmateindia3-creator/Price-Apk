@@ -1,50 +1,80 @@
-name: Build Release APK
+name: Build Flutter APK
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Repo Code Fetch
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Setup Java 17 JDK
-      - name: Setup Java JDK
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
+          distribution: 'zulu'
           java-version: '17'
-          distribution: 'temurin'
 
-      # 3. Setup Flutter SDK
-      - name: Setup Flutter SDK
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
-          cache: true
+          flutter-version: '3.19.x'
 
-      # 4. Generate Missing Android Files (Fixes build.gradle error)
-      - name: Generate Android Files
-        run: flutter create --platforms=android .
+      # 1. Create Android folder structure if missing
+      - name: Create Android Platform Code
+        run: flutter create . --platforms=android
 
-      # 5. Install Dependencies
-      - name: Get Flutter Packages
+      # 2. Force Inject Internet & Location Permissions into AndroidManifest
+      - name: Inject Permissions
+        run: |
+          mkdir -p android/app/src/main
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+              <application
+                  android:label="fuel_weather_app"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:taskAffinity=""
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboardEntirety|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <meta-data
+                        android:name="io.flutter.embedding.android.NormalTheme"
+                        android:resource="@style/NormalTheme"
+                        />
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+              </application>
+          </manifest>
+          EOF
+
+      - name: Install Dependencies
         run: flutter pub get
 
-      # 6. Build Release APK
-      - name: Build APK
+      - name: Build Release APK
         run: flutter build apk --release
 
-      # 7. Upload APK Artifact
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: FuelWeather-Release-APK
+          name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          
