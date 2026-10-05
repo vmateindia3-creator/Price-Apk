@@ -21,14 +21,16 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Generate Android App Files
-        run: flutter create --platforms=android --org com.vmateindia.priceapk .
+      - name: Re-create Android Project Structure
+        run: |
+          rm -rf android
+          flutter create --platforms=android --org com.vmateindia.priceapk .
 
-      - name: Set Minimum Android SDK
+      - name: Configure Android Properties
         run: |
           echo "flutter.minSdkVersion=21" >> android/local.properties
 
-      - name: Inject Google Services JSON
+      - name: Restore Firebase Config
         run: |
           if [ -f "google-services.json" ]; then
             cp google-services.json android/app/
@@ -40,9 +42,9 @@ jobs:
       - name: Build Release APK
         run: flutter build apk --release
 
-      - name: Upload Release APK Artifact
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           
