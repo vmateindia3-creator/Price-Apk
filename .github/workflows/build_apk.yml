@@ -21,7 +21,7 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Re-create Android Project Structure
+      - name: Re-create Clean Android Structure
         run: |
           rm -rf android
           flutter create --platforms=android --org com.vmateindia.priceapk .
