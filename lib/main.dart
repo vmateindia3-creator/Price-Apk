@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,12 +54,29 @@ class _HomeScreenState extends State<HomeScreen> {
   String dieselPrice = '₹89.62';
 
   bool isLoading = false;
+  bool isLocationGranted = false;
   final TextEditingController _cityController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _fetchWeatherByCity(cityName);
+    _requestAppPermissionsOnStart();
+  }
+
+  // App Open Hote Hi All Permissions Maangne Ka System
+  Future<void> _requestAppPermissionsOnStart() async {
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.locationWhenInUse,
+    ].request();
+
+    if (statuses[Permission.locationWhenInUse]?.isGranted ?? false) {
+      setState(() => isLocationGranted = true);
+      _fetchWeatherByGPS();
+    } else {
+      setState(() => isLocationGranted = false);
+      _showToast('Location Permission nahi mili. Manual search use karein.');
+      _fetchWeatherByCity(cityName);
+    }
   }
 
   void _showToast(String msg) {
@@ -75,25 +93,24 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Prototype ke exact colors par aadharit Dynamic Gradient Colors
   List<Color> _getTemperatureGradient() {
     if (temp == null) {
-      return [const Color(0xFF1E3C72), const Color(0xFF2A5298)]; // Pleasant/Default
+      return [const Color(0xFF11998E), const Color(0xFF38EF7D)];
     }
 
     String cond = weatherMain.toLowerCase();
     if (cond.contains('rain') || cond.contains('drizzle') || cond.contains('thunderstorm')) {
-      return [const Color(0xFF373B44), const Color(0xFF4286F4)]; // Rain/Storm
+      return [const Color(0xFF373B44), const Color(0xFF4286F4)];
     }
 
     if (temp! >= 35) {
-      return [const Color(0xFFFF512F), const Color(0xFFDD2476)]; // Hot
+      return [const Color(0xFFFF512F), const Color(0xFFDD2476)];
     } else if (temp! >= 25) {
-      return [const Color(0xFFFF8008), const Color(0xFFFFC837)]; // Warm
+      return [const Color(0xFFFF8008), const Color(0xFFFFC837)];
     } else if (temp! <= 15) {
-      return [const Color(0xFF1E3C72), const Color(0xFF2A5298)]; // Cold
+      return [const Color(0xFF1E3C72), const Color(0xFF2A5298)];
     } else {
-      return [const Color(0xFF11998E), const Color(0xFF38EF7D)]; // Pleasant
+      return [const Color(0xFF11998E), const Color(0xFF38EF7D)];
     }
   }
 
@@ -107,7 +124,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Icons.wb_cloudy;
   }
 
-  // City Search Fetch
   Future<void> _fetchWeatherByCity(String city) async {
     if (city.trim().isEmpty) return;
     setState(() => isLoading = true);
@@ -132,36 +148,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Current GPS Location Fetch
   Future<void> _fetchWeatherByGPS() async {
+    // Check Status Before Triggering
+    var status = await Permission.locationWhenInUse.status;
+    if (!status.isGranted) {
+      _showToast('Location permission off hai. Feature disabled.');
+      return;
+    }
+
     setState(() => isLoading = true);
 
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _showToast('GPS Location Services OFF hain. Mobile Settings se ON karein.');
-        setState(() => isLoading = false);
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          _showToast('Location permission deny kar di gayi.');
-          setState(() => isLoading = false);
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        _showToast('Settings me jaakar App ki Location Permission Allow karein.');
-        setState(() => isLoading = false);
-        return;
-      }
-
       Position pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 10),
       );
 
       final url = Uri.parse(
@@ -172,12 +172,12 @@ class _HomeScreenState extends State<HomeScreen> {
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         _parseAndSetData(data);
-        _showToast('Live Location detected: $cityName');
+        _showToast('Live Location: $cityName');
       } else {
-        _showToast('GPS Weather Data fetch nahi ho saka.');
+        _showToast('GPS Data fetch nahi ho saka.');
       }
     } catch (e) {
-      _showToast('GPS Location fetch karne me problem aayi.');
+      _showToast('GPS location nahi mil saki.');
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -198,7 +198,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchFuelPrice(cityName);
   }
 
-  // Live Fuel Rates Firestore & Fallback Logic
   Future<void> _fetchFuelPrice(String city) async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -213,7 +212,6 @@ class _HomeScreenState extends State<HomeScreen> {
           dieselPrice = '₹${data['diesel'] ?? '89.62'}';
         });
       } else {
-        // Fallback calculations matching prototype
         int len = city.length;
         double p = 95.0 + (len % 8) + 0.72;
         double d = 87.0 + (len % 6) + 0.62;
@@ -258,7 +256,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Search Bar & GPS Icon
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                         decoration: BoxDecoration(
@@ -292,16 +289,16 @@ class _HomeScreenState extends State<HomeScreen> {
                               },
                             ),
                             IconButton(
-                              icon: const Icon(Icons.my_location, color: Colors.white),
+                              icon: Icon(
+                                Icons.my_location,
+                                color: isLocationGranted ? Colors.white : Colors.white38,
+                              ),
                               onPressed: _fetchWeatherByGPS,
                             ),
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 30),
-
-                      // Weather Main Hero Display
                       Column(
                         children: [
                           Text(
@@ -338,8 +335,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           const SizedBox(height: 15),
-
-                          // Humidity & Wind Box
                           Container(
                             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
                             decoration: BoxDecoration(
@@ -362,12 +357,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 35),
-
-                      // Fuel Section Title
                       const Text(
-                        'TODAY\'S LIVE FUEL RATES',
+                        "TODAY'S LIVE FUEL RATES",
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 13,
@@ -376,8 +368,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-
-                      // Fuel Grid Cards
                       Row(
                         children: [
                           Expanded(
@@ -393,8 +383,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-
-              // Loading Spinner Overlay
               if (isLoading)
                 Container(
                   color: Colors.black.withOpacity(0.4),
