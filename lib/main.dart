@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,7 +42,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final String weatherApiKey = '42e264af50f9b2c516011c9467291294';
 
-  String cityName = 'LUCKNOW';
+  String cityName = 'LUCKNOW'; // Default fallback
   double? temp;
   String weatherMain = 'Clear';
   String weatherDesc = 'CLEAR SKY';
@@ -60,23 +59,42 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _requestAppPermissionsOnStart();
+    _checkPermissionsAndFetchLocation();
   }
 
-  // App Open Hote Hi All Permissions Maangne Ka System
-  Future<void> _requestAppPermissionsOnStart() async {
-    Map<Permission, PermissionStatus> statuses = await [
-      Permission.locationWhenInUse,
-    ].request();
+  // APP START HOTE HI AUTO-LOCATION DETECT KAREGA
+  Future<void> _checkPermissionsAndFetchLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
 
-    if (statuses[Permission.locationWhenInUse]?.isGranted ?? false) {
-      setState(() => isLocationGranted = true);
-      _fetchWeatherByGPS();
-    } else {
-      setState(() => isLocationGranted = false);
-      _showToast('Location Permission nahi mili. Manual search use karein.');
+    // 1. Check if GPS is ON in mobile
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showToast('GPS OFF hai. Manual default city data load ho raha hai.');
       _fetchWeatherByCity(cityName);
+      return;
     }
+
+    // 2. Check App Permissions
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission(); // Mange ga permission
+      if (permission == LocationPermission.denied) {
+        _showToast('Location permission deny kar di gayi. Manual search use karein.');
+        _fetchWeatherByCity(cityName);
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _showToast('Location permanently deny hai. Mobile Settings me jaakar allow karein.');
+      _fetchWeatherByCity(cityName);
+      return;
+    }
+
+    // Agar permission mil gayi toh sidha GPS data fetch karega
+    setState(() => isLocationGranted = true);
+    _fetchWeatherByGPS();
   }
 
   void _showToast(String msg) {
@@ -97,12 +115,10 @@ class _HomeScreenState extends State<HomeScreen> {
     if (temp == null) {
       return [const Color(0xFF11998E), const Color(0xFF38EF7D)];
     }
-
     String cond = weatherMain.toLowerCase();
     if (cond.contains('rain') || cond.contains('drizzle') || cond.contains('thunderstorm')) {
       return [const Color(0xFF373B44), const Color(0xFF4286F4)];
     }
-
     if (temp! >= 35) {
       return [const Color(0xFFFF512F), const Color(0xFFDD2476)];
     } else if (temp! >= 25) {
@@ -137,7 +153,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         _parseAndSetData(data);
-        _showToast('$cityName ka data update ho gaya!');
       } else {
         _showToast('City nahi mili! Sahi naam enter karein.');
       }
@@ -149,19 +164,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchWeatherByGPS() async {
-    // Check Status Before Triggering
-    var status = await Permission.locationWhenInUse.status;
-    if (!status.isGranted) {
-      _showToast('Location permission off hai. Feature disabled.');
-      return;
-    }
-
     setState(() => isLoading = true);
 
     try {
       Position pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 10),
+        timeLimit: const Duration(seconds: 8),
       );
 
       final url = Uri.parse(
@@ -172,12 +180,12 @@ class _HomeScreenState extends State<HomeScreen> {
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         _parseAndSetData(data);
-        _showToast('Live Location: $cityName');
+        _showToast('Auto Live Location detected: $cityName');
       } else {
-        _showToast('GPS Data fetch nahi ho saka.');
+        _showToast('GPS Weather Data fetch nahi ho saka.');
       }
     } catch (e) {
-      _showToast('GPS location nahi mil saki.');
+      _showToast('Auto GPS detect fail ho gaya. Manual search karein.');
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -291,9 +299,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             IconButton(
                               icon: Icon(
                                 Icons.my_location,
-                                color: isLocationGranted ? Colors.white : Colors.white38,
+                                color: isLocationGranted ? Colors.white : Colors.white70,
                               ),
-                              onPressed: _fetchWeatherByGPS,
+                              onPressed: _checkPermissionsAndFetchLocation,
                             ),
                           ],
                         ),
