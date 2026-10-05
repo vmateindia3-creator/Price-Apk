@@ -24,34 +24,30 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Rebuild Fresh Android Project Files
+      - name: Create Android Platform Code
         run: |
           rm -rf android
-          flutter create --platforms=android .
+          flutter create --platforms=android --org com.example.priceapk .
 
-      - name: Force Fix minSdkVersion 21
+      - name: Inject minSdkVersion 21
         run: |
           python3 -c "
+          import os
           path = 'android/app/build.gradle'
-          with open(path, 'r') as f:
-              content = f.read()
-          if 'minSdkVersion' in content:
-              lines = content.split('\n')
-              for i, line in enumerate(lines):
-                  if 'minSdkVersion' in line:
-                      lines[i] = '        minSdkVersion 21'
-              content = '\n'.join(lines)
+          if os.path.exists(path):
+              with open(path, 'r') as f:
+                  content = f.read()
+              content = content.replace('minSdkVersion flutter.minSdkVersion', 'minSdkVersion 21')
+              content = content.replace('minSdkVersion 19', 'minSdkVersion 21')
+              with open(path, 'w') as f:
+                  f.write(content)
           else:
-              content = content.replace('defaultConfig {', 'defaultConfig {\n        minSdkVersion 21')
-          with open(path, 'w') as f:
-              f.write(content)
+              print('Warning: build.gradle not found, skipping patch.')
           "
 
       - name: Restore Google Services Config
         run: |
-          if [ -f "android/app/google-services.json" ]; then
-            echo "google-services.json already in android/app"
-          elif [ -f "google-services.json" ]; then
+          if [ -f "google-services.json" ]; then
             cp google-services.json android/app/
           fi
 
