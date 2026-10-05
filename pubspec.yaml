@@ -1,5 +1,5 @@
 name: price_apk
-description: A new Flutter project for live fuel rates and weather updates.
+description: "Live fuel rates and dynamic weather app with GPS integration."
 
 publish_to: 'none'
 
@@ -11,10 +11,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: ^1.1.0
-  geolocator: ^10.1.0
-  cloud_firestore: ^4.13.0
-  firebase_core: ^2.24.0
+  http: ^1.2.0
+  geolocator: ^11.0.0
+  cloud_firestore: ^4.15.8
+  firebase_core: ^2.27.0
 
 dev_dependencies:
   flutter_test:
