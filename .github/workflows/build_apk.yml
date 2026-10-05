@@ -1,4 +1,4 @@
-name: Build Android Release APK
+name: Build Release APK
 
 on:
   push:
@@ -10,42 +10,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Create Android Platform Code
-        run: |
-          rm -rf android
-          flutter create --platforms=android --org com.example.priceapk .
+      - name: Generate Android Files
+        run: flutter create --platforms=android --org com.vmateindia.priceapk .
 
-      - name: Inject minSdkVersion 21
+      - name: Set Minimum SDK 21
         run: |
-          python3 -c "
-          import os
-          path = 'android/app/build.gradle'
-          if os.path.exists(path):
-              with open(path, 'r') as f:
-                  content = f.read()
-              content = content.replace('minSdkVersion flutter.minSdkVersion', 'minSdkVersion 21')
-              content = content.replace('minSdkVersion 19', 'minSdkVersion 21')
-              with open(path, 'w') as f:
-                  f.write(content)
-          else:
-              print('Warning: build.gradle not found, skipping patch.')
-          "
+          echo "flutter.minSdkVersion=21" >> android/local.properties
 
-      - name: Restore Google Services Config
+      - name: Restore Firebase Config
         run: |
           if [ -f "google-services.json" ]; then
             cp google-services.json android/app/
@@ -57,7 +40,7 @@ jobs:
       - name: Build Release APK
         run: flutter build apk --release
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
