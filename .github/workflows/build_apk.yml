@@ -24,16 +24,34 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Generate Android Platform Files
-        run: flutter create --platforms=android .
-
-      - name: Set minSdkVersion in local.properties
+      - name: Rebuild Fresh Android Project Files
         run: |
-          echo "flutter.minSdkVersion=21" >> android/local.properties
+          rm -rf android
+          flutter create --platforms=android .
+
+      - name: Force Fix minSdkVersion 21
+        run: |
+          python3 -c "
+          path = 'android/app/build.gradle'
+          with open(path, 'r') as f:
+              content = f.read()
+          if 'minSdkVersion' in content:
+              lines = content.split('\n')
+              for i, line in enumerate(lines):
+                  if 'minSdkVersion' in line:
+                      lines[i] = '        minSdkVersion 21'
+              content = '\n'.join(lines)
+          else:
+              content = content.replace('defaultConfig {', 'defaultConfig {\n        minSdkVersion 21')
+          with open(path, 'w') as f:
+              f.write(content)
+          "
 
       - name: Restore Google Services Config
         run: |
-          if [ -f "google-services.json" ]; then
+          if [ -f "android/app/google-services.json" ]; then
+            echo "google-services.json already in android/app"
+          elif [ -f "google-services.json" ]; then
             cp google-services.json android/app/
           fi
 
