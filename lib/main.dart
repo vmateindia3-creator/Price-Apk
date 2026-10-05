@@ -1,10 +1,16 @@
 import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp();
+
   runApp(const MyApp());
 }
 
@@ -36,22 +42,25 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   String cityName = "Lucknow";
+
   double temperature = 31.0;
   String weatherDescription = "CLEAR SKY";
   int humidity = 55;
   double windSpeed = 2.0;
   int weatherCode = 0;
 
-  // Baad mein in values ko Firebase se replace kar sakte hain.
   double petrolRate = 102.72;
   double dieselRate = 88.62;
 
   bool isLoading = false;
+  bool isFuelLoading = false;
 
   @override
   void initState() {
     super.initState();
+
     _fetchWeatherByCity(cityName);
+    _loadFuelRates(cityName);
   }
 
   @override
@@ -61,7 +70,74 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
   }
 
   // ------------------------------------------------------------
-  // CITY SEARCH
+  // FIREBASE FUEL RATES
+  // ------------------------------------------------------------
+
+  Future<void> _loadFuelRates(String city) async {
+    final normalizedCity = city.trim().toLowerCase();
+
+    if (normalizedCity.isEmpty) return;
+
+    if (mounted) {
+      setState(() {
+        isFuelLoading = true;
+      });
+    }
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('fuel_rates')
+          .doc(normalizedCity)
+          .get();
+
+      if (!doc.exists) {
+        debugPrint('Fuel document not found for city: $normalizedCity');
+        return;
+      }
+
+      final data = doc.data();
+
+      if (data == null) return;
+
+      final petrol = _toDouble(data['petrol']);
+      final diesel = _toDouble(data['diesel']);
+
+      if (!mounted) return;
+
+      setState(() {
+        if (petrol != null) {
+          petrolRate = petrol;
+        }
+
+        if (diesel != null) {
+          dieselRate = diesel;
+        }
+      });
+    } catch (e) {
+      debugPrint('Firebase fuel rate error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isFuelLoading = false;
+        });
+      }
+    }
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    if (value is String) {
+      return double.tryParse(value);
+    }
+
+    return null;
+  }
+
+  // ------------------------------------------------------------
+  // CITY WEATHER SEARCH
   // ------------------------------------------------------------
 
   Future<void> _fetchWeatherByCity(String queryCity) async {
@@ -73,7 +149,9 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
     }
 
     if (mounted) {
-      setState(() => isLoading = true);
+      setState(() {
+        isLoading = true;
+      });
     }
 
     try {
@@ -98,7 +176,6 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
       }
 
       final geoData = jsonDecode(geoResponse.body);
-
       final results = geoData['results'];
 
       if (results is List && results.isNotEmpty) {
@@ -112,12 +189,15 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
           return;
         }
 
+        final resultName = result['name'];
+
         final resolvedCity =
-            (result['name'] as String?)?.trim().isNotEmpty == true
-                ? result['name'] as String
+            resultName is String && resultName.trim().isNotEmpty
+                ? resultName.trim()
                 : city;
 
         await _getWeatherFromCoords(lat, lon, resolvedCity);
+        await _loadFuelRates(resolvedCity);
       } else {
         _showToast("Shehar nahi mila!");
       }
@@ -126,18 +206,22 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
       _showToast("City search karne mein problem aayi.");
     } finally {
       if (mounted) {
-        setState(() => isLoading = false);
+        setState(() {
+          isLoading = false;
+        });
       }
     }
   }
 
   // ------------------------------------------------------------
-  // CURRENT LOCATION
+  // GPS LOCATION
   // ------------------------------------------------------------
 
   Future<void> _checkPermissionsAndFetchLocation() async {
     if (mounted) {
-      setState(() => isLoading = true);
+      setState(() {
+        isLoading = true;
+      });
     }
 
     try {
@@ -161,8 +245,7 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
 
       if (permission == LocationPermission.deniedForever) {
         _showToast(
-          "Location permission permanently denied hai. "
-          "Settings se permission enable karein.",
+          "Location permission permanently denied hai. Settings se enable karein.",
         );
         return;
       }
@@ -183,13 +266,15 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
       _showToast("Location fetch karne mein problem aayi.");
     } finally {
       if (mounted) {
-        setState(() => isLoading = false);
+        setState(() {
+          isLoading = false;
+        });
       }
     }
   }
 
   // ------------------------------------------------------------
-  // WEATHER API
+  // WEATHER
   // ------------------------------------------------------------
 
   Future<void> _getWeatherFromCoords(
@@ -220,7 +305,6 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
       }
 
       final data = jsonDecode(response.body);
-
       final current = data['current'];
 
       if (current is! Map) {
@@ -237,7 +321,8 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
       final windValue =
           (current['wind_speed_10m'] as num?)?.toDouble();
 
-      final codeValue = (current['weather_code'] as num?)?.toInt();
+      final codeValue =
+          (current['weather_code'] as num?)?.toInt();
 
       if (temperatureValue == null ||
           humidityValue == null ||
@@ -265,116 +350,53 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
     }
   }
 
-  // ------------------------------------------------------------
-  // WEATHER DESCRIPTION
-  // ------------------------------------------------------------
-
   String _getWeatherDescription(int code) {
     switch (code) {
       case 0:
         return "CLEAR SKY";
-
       case 1:
         return "MAINLY CLEAR";
-
       case 2:
         return "PARTLY CLOUDY";
-
       case 3:
         return "OVERCAST";
-
       case 45:
       case 48:
         return "FOGGY";
-
       case 51:
       case 53:
       case 55:
         return "DRIZZLE";
-
-      case 56:
-      case 57:
-        return "FREEZING DRIZZLE";
-
       case 61:
       case 63:
       case 65:
         return "RAIN";
-
-      case 66:
-      case 67:
-        return "FREEZING RAIN";
-
       case 71:
       case 73:
       case 75:
       case 77:
         return "SNOW";
-
       case 80:
       case 81:
       case 82:
         return "RAIN SHOWERS";
-
-      case 85:
-      case 86:
-        return "SNOW SHOWERS";
-
       case 95:
         return "THUNDERSTORM";
-
-      case 96:
-      case 99:
-        return "THUNDERSTORM WITH HAIL";
-
       default:
         return "UNKNOWN";
     }
   }
 
-  // ------------------------------------------------------------
-  // WEATHER ICON
-  // ------------------------------------------------------------
-
   IconData _getWeatherIcon(int code) {
-    if (code == 0) {
-      return Icons.wb_sunny;
-    }
-
-    if (code >= 1 && code <= 3) {
-      return Icons.cloud;
-    }
-
-    if (code >= 45 && code <= 48) {
-      return Icons.foggy;
-    }
-
-    if (code >= 51 && code <= 67) {
-      return Icons.grain;
-    }
-
-    if (code >= 71 && code <= 77) {
-      return Icons.ac_unit;
-    }
-
-    if (code >= 80 && code <= 82) {
-      return Icons.water_drop;
-    }
-
-    if (code >= 85 && code <= 86) {
-      return Icons.ac_unit;
-    }
-
-    if (code >= 95 && code <= 99) {
-      return Icons.thunderstorm;
-    }
-
+    if (code == 0) return Icons.wb_sunny;
+    if (code >= 1 && code <= 3) return Icons.cloud;
+    if (code >= 45 && code <= 48) return Icons.foggy;
+    if (code >= 51 && code <= 67) return Icons.grain;
+    if (code >= 71 && code <= 77) return Icons.ac_unit;
+    if (code >= 80 && code <= 82) return Icons.water_drop;
+    if (code >= 95) return Icons.thunderstorm;
     return Icons.wb_sunny;
   }
-
-  // ------------------------------------------------------------
-  // SNACKBAR
-  // ------------------------------------------------------------
 
   void _showToast(String message) {
     if (!mounted) return;
@@ -402,7 +424,6 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // SEARCH BAR
               Row(
                 children: [
                   Expanded(
@@ -421,52 +442,40 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                           borderRadius: BorderRadius.circular(30),
                           borderSide: BorderSide.none,
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                        ),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 20),
                       ),
                       onSubmitted: (value) {
-                        if (value.trim().isNotEmpty) {
-                          _fetchWeatherByCity(value.trim());
+                        final city = value.trim();
+                        if (city.isNotEmpty) {
+                          _fetchWeatherByCity(city);
                           _searchController.clear();
                         }
                       },
                     ),
                   ),
                   const SizedBox(width: 5),
-
                   IconButton(
                     tooltip: "Search",
-                    icon: const Icon(
-                      Icons.search,
-                      color: Colors.white,
-                    ),
+                    icon: const Icon(Icons.search, color: Colors.white),
                     onPressed: () {
                       final city = _searchController.text.trim();
-
                       if (city.isNotEmpty) {
                         _fetchWeatherByCity(city);
                         _searchController.clear();
                       }
                     },
                   ),
-
                   IconButton(
                     tooltip: "Current Location",
-                    icon: const Icon(
-                      Icons.my_location,
-                      color: Colors.white,
-                    ),
+                    icon: const Icon(Icons.my_location, color: Colors.white),
                     onPressed: isLoading
                         ? null
                         : _checkPermissionsAndFetchLocation,
                   ),
                 ],
               ),
-
               const SizedBox(height: 30),
-
-              // WEATHER
               Center(
                 child: Column(
                   children: [
@@ -480,17 +489,13 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                         letterSpacing: 1.5,
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
                     Icon(
                       _getWeatherIcon(weatherCode),
                       size: 70,
                       color: Colors.white,
                     ),
-
                     const SizedBox(height: 10),
-
                     Text(
                       '${temperature.toStringAsFixed(1)}°C',
                       style: const TextStyle(
@@ -499,7 +504,6 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                         color: Colors.white,
                       ),
                     ),
-
                     Text(
                       weatherDescription,
                       textAlign: TextAlign.center,
@@ -513,15 +517,10 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 25),
-
-              // WEATHER DETAILS
               Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 15,
-                  horizontal: 20,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
@@ -533,11 +532,8 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.water_drop,
-                            color: Colors.white,
-                            size: 20,
-                          ),
+                          const Icon(Icons.water_drop,
+                              color: Colors.white, size: 20),
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
@@ -552,18 +548,12 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                         ],
                       ),
                     ),
-
                     const SizedBox(width: 15),
-
                     Flexible(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.air,
-                            color: Colors.white,
-                            size: 20,
-                          ),
+                          const Icon(Icons.air, color: Colors.white, size: 20),
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
@@ -581,10 +571,7 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 30),
-
-              // FUEL HEADER
               const Text(
                 "TODAY'S LIVE FUEL RATES",
                 style: TextStyle(
@@ -594,10 +581,7 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   letterSpacing: 1.1,
                 ),
               ),
-
               const SizedBox(height: 15),
-
-              // FUEL CARDS
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -609,9 +593,7 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                       iconColor: Colors.redAccent,
                     ),
                   ),
-
                   const SizedBox(width: 15),
-
                   Expanded(
                     child: _fuelCard(
                       title: "DIESEL",
@@ -622,14 +604,11 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   ),
                 ],
               ),
-
-              if (isLoading)
+              if (isLoading || isFuelLoading)
                 const Padding(
                   padding: EdgeInsets.only(top: 20),
                   child: Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                    ),
+                    child: CircularProgressIndicator(color: Colors.white),
                   ),
                 ),
             ],
@@ -638,10 +617,6 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
       ),
     );
   }
-
-  // ------------------------------------------------------------
-  // FUEL CARD
-  // ------------------------------------------------------------
 
   Widget _fuelCard({
     required String title,
@@ -668,15 +643,10 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   color: Colors.white,
                 ),
               ),
-              Icon(
-                icon,
-                color: iconColor,
-              ),
+              Icon(icon, color: iconColor),
             ],
           ),
-
           const SizedBox(height: 12),
-
           Text(
             "₹${price.toStringAsFixed(2)}",
             style: const TextStyle(
@@ -685,15 +655,10 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
               color: Colors.white,
             ),
           ),
-
           const SizedBox(height: 4),
-
           const Text(
-            "Standard City Rate",
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white70,
-            ),
+            "Firebase City Rate",
+            style: TextStyle(fontSize: 12, color: Colors.white70),
           ),
         ],
       ),
