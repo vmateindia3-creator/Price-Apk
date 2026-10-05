@@ -59,128 +59,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // UI puri tarah render hone ke baad hi permission mangega (Popup block nahi hoga)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkPermissionsAndFetchLocation();
     });
   }
 
   Future<void> _checkPermissionsAndFetchLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    // 1. Check if GPS is enabled in phone settings
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      _showToast('Mobile ki GPS Location ON karein.');
-      _fetchWeatherByCity(cityName);
-      return;
-    }
-
-    // 2. Check and request app permissions
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        _showToast('Location permission deny kar di gayi.');
-        _fetchWeatherByCity(cityName);
-        return;
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      _showToast('Settings se Location permission allow karein.');
-      _fetchWeatherByCity(cityName);
-      return;
-    }
-
-    // Permission granted, now fetch location
-    setState(() => isLocationGranted = true);
-    await _fetchWeatherByGPS();
-  }
-
-  void _showToast(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-        backgroundColor: const Color(0xFF1E293BLocation track na hone ke 3 main reasons ho sakte hain: mobile me actually GPS (Location) button off hona, network weak hona, ya code me permission timeout ho jana. 
-
-Is baar maine code me **Advanced Error Handling** aur **Force Location Fetch** ka logic lagaya hai. Ye code step-by-step check karega ki galti kahan ho rahi hai aur aapko screen par exact error bata dega (jaise "GPS Off hai" ya "Permission nahi mili").
-
-Apne `lib/main.dart` ko is 100% tested code se replace karein:
-
-```dart
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:geolocator/geolocator.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_core/firebase_core.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp();
-  } catch (e) {
-    debugPrint("Firebase Init Error: $e");
-  }
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Fuel & Weather',
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Roboto',
-      ),
-      home: const HomeScreen(),
-    );
-  }
-}
-
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  final String weatherApiKey = '42e264af50f9b2c516011c9467291294';
-
-  String cityName = 'LUCKNOW';
-  double? temp;
-  String weatherMain = 'Clear';
-  String weatherDesc = 'CLEAR SKY';
-  String humidity = '62%';
-  String windSpeed = '12 km/h';
-
-  String petrolPrice = '₹96.72';
-  String dieselPrice = '₹89.62';
-
-  bool isLoading = false;
-  bool isLocationGranted = false;
-  final TextEditingController _cityController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _checkPermissionsAndFetchLocation();
-  }
-
-  Future<void> _checkPermissionsAndFetchLocation() async {
     setState(() => isLoading = true);
-    
     try {
-      // 1. Mobile ka GPS switch check karega
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         _showToast('Mobile ka Location (GPS) OFF hai! Upar se ON karein.');
@@ -188,7 +74,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // 2. App Permissions check karega
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -205,12 +90,10 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Agar sab sahi hai toh GPS se location nikalega
       setState(() => isLocationGranted = true);
       await _fetchWeatherByGPS();
-      
     } catch (e) {
-      _showToast('Permission check me error: $e');
+      _showToast('Permission check error: $e');
       await _fetchWeatherByCity(cityName);
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -219,18 +102,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchWeatherByGPS() async {
     setState(() => isLoading = true);
-
     try {
       _showToast('Live Location dhoondh raha hai...');
-      
-      // Accuracy low rakhi hai taaki ghar ke andar (indoors) bhi jaldi detect ho jaye
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.low,
         timeLimit: const Duration(seconds: 15),
       );
 
       final url = Uri.parse(
-        '[https://api.openweathermap.org/data/2.5/weather?lat=$](https://api.openweathermap.org/data/2.5/weather?lat=$){position.latitude}&lon=${position.longitude}&units=metric&appid=$weatherApiKey',
+        'https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&units=metric&appid=$weatherApiKey',
       );
 
       final res = await http.get(url);
@@ -243,12 +123,11 @@ class _HomeScreenState extends State<HomeScreen> {
         _fetchWeatherByCity(cityName);
       }
     } catch (e) {
-      // Agar 15 second me current location na mile, toh mobile ki saved last location uthayega
       try {
         Position? lastPos = await Geolocator.getLastKnownPosition();
         if (lastPos != null) {
           final url = Uri.parse(
-            '[https://api.openweathermap.org/data/2.5/weather?lat=$](https://api.openweathermap.org/data/2.5/weather?lat=$){lastPos.latitude}&lon=${lastPos.longitude}&units=metric&appid=$weatherApiKey',
+            'https://api.openweathermap.org/data/2.5/weather?lat=${lastPos.latitude}&lon=${lastPos.longitude}&units=metric&appid=$weatherApiKey',
           );
           final res = await http.get(url);
           if (res.statusCode == 200) {
@@ -259,7 +138,6 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         }
       } catch (lastErr) {}
-      
       _showToast('Location track fail hua. Network ya GPS weak hai.');
       _fetchWeatherByCity(cityName);
     } finally {
@@ -306,10 +184,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchWeatherByCity(String city) async {
     if (city.trim().isEmpty) return;
     setState(() => isLoading = true);
-
     try {
       final url = Uri.parse(
-        '[https://api.openweathermap.org/data/2.5/weather?q=$](https://api.openweathermap.org/data/2.5/weather?q=$){Uri.encodeComponent(city.trim())}&units=metric&appid=$weatherApiKey',
+        'https://api.openweathermap.org/data/2.5/weather?q=${Uri.encodeComponent(city.trim())}&units=metric&appid=$weatherApiKey',
       );
       final res = await http.get(url);
 
@@ -548,4 +425,21 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(type, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+              Text(emoji, style: const TextStyle(fontSize: 22)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(price, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text('Standard City Rate', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
