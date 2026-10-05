@@ -42,7 +42,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final String weatherApiKey = '42e264af50f9b2c516011c9467291294';
 
-  String cityName = 'LUCKNOW'; // Default fallback
+  String cityName = 'LUCKNOW';
   double? temp;
   String weatherMain = 'Clear';
   String weatherDesc = 'CLEAR SKY';
@@ -59,40 +59,38 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // App khulte hi sabse pehle location permission check karega aur detect karega
     _checkPermissionsAndFetchLocation();
   }
 
-  // APP START HOTE HI AUTO-LOCATION DETECT KAREGA
+  // Location Permissions Handling Logic (Fixed)
   Future<void> _checkPermissionsAndFetchLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
 
-    // 1. Check if GPS is ON in mobile
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      _showToast('GPS OFF hai. Manual default city data load ho raha hai.');
+      _showToast('GPS Location OFF hai. Default city load ho rahi hai.');
       _fetchWeatherByCity(cityName);
       return;
     }
 
-    // 2. Check App Permissions
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission(); // Mange ga permission
+      permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
-        _showToast('Location permission deny kar di gayi. Manual search use karein.');
+        _showToast('Location permission deny kar di gayi.');
         _fetchWeatherByCity(cityName);
         return;
       }
     }
 
     if (permission == LocationPermission.deniedForever) {
-      _showToast('Location permanently deny hai. Mobile Settings me jaakar allow karein.');
+      _showToast('Location permanently deny hai. Settings se allow karein.');
       _fetchWeatherByCity(cityName);
       return;
     }
 
-    // Agar permission mil gayi toh sidha GPS data fetch karega
     setState(() => isLocationGranted = true);
     _fetchWeatherByGPS();
   }
@@ -163,14 +161,27 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Location Fetch Logic (Fixed with fallback and better timeout)
   Future<void> _fetchWeatherByGPS() async {
     setState(() => isLoading = true);
 
     try {
-      Position pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 8),
-      );
+      Position? pos;
+      try {
+        pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.low,
+          timeLimit: const Duration(seconds: 15),
+        );
+      } catch (e) {
+        // Agar live detect nahi ho paya (timeout), toh phone ki last location uthayega
+        pos = await Geolocator.getLastKnownPosition();
+      }
+
+      if (pos == null) {
+        _showToast('Location detect nahi ho payi. Default city load ho rahi hai.');
+        _fetchWeatherByCity(cityName);
+        return;
+      }
 
       final url = Uri.parse(
         'https://api.openweathermap.org/data/2.5/weather?lat=${pos.latitude}&lon=${pos.longitude}&units=metric&appid=$weatherApiKey',
@@ -180,12 +191,14 @@ class _HomeScreenState extends State<HomeScreen> {
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         _parseAndSetData(data);
-        _showToast('Auto Live Location detected: $cityName');
+        _showToast('Live Location detected: $cityName');
       } else {
         _showToast('GPS Weather Data fetch nahi ho saka.');
+        _fetchWeatherByCity(cityName);
       }
     } catch (e) {
-      _showToast('Auto GPS detect fail ho gaya. Manual search karein.');
+      _showToast('GPS fetch me error aayi. Manual search use karein.');
+      _fetchWeatherByCity(cityName);
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
