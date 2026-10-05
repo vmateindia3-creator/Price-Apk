@@ -1,8 +1,6 @@
 name: price_apk
 description: "Live fuel rates and dynamic weather app with GPS integration."
-
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
@@ -15,7 +13,6 @@ dependencies:
   geolocator: ^11.0.0
   cloud_firestore: ^4.15.8
   firebase_core: ^2.27.0
-  permission_handler: ^11.3.1  # <-- Ye new line add kardi hai
 
 dev_dependencies:
   flutter_test:
@@ -24,4 +21,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
