@@ -69,10 +69,6 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
     super.dispose();
   }
 
-  // ------------------------------------------------------------
-  // FIREBASE FUEL RATES
-  // ------------------------------------------------------------
-
   Future<void> _loadFuelRates(String city) async {
     final normalizedCity = city.trim().toLowerCase();
 
@@ -91,7 +87,9 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
           .get();
 
       if (!doc.exists) {
-        debugPrint('Fuel document not found for city: $normalizedCity');
+        debugPrint(
+          'Fuel document not found for city: $normalizedCity',
+        );
         return;
       }
 
@@ -135,10 +133,6 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
 
     return null;
   }
-
-  // ------------------------------------------------------------
-  // CITY WEATHER SEARCH
-  // ------------------------------------------------------------
 
   Future<void> _fetchWeatherByCity(String queryCity) async {
     final city = queryCity.trim();
@@ -196,7 +190,12 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                 ? resultName.trim()
                 : city;
 
-        await _getWeatherFromCoords(lat, lon, resolvedCity);
+        await _getWeatherFromCoords(
+          lat,
+          lon,
+          resolvedCity,
+        );
+
         await _loadFuelRates(resolvedCity);
       } else {
         _showToast("Shehar nahi mila!");
@@ -213,10 +212,6 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
     }
   }
 
-  // ------------------------------------------------------------
-  // GPS LOCATION
-  // ------------------------------------------------------------
-
   Future<void> _checkPermissionsAndFetchLocation() async {
     if (mounted) {
       setState(() {
@@ -225,14 +220,16 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
     }
 
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final serviceEnabled =
+          await Geolocator.isLocationServiceEnabled();
 
       if (!serviceEnabled) {
         _showToast("GPS / Location service off hai.");
         return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
+      LocationPermission permission =
+          await Geolocator.checkPermission();
 
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -245,15 +242,15 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
 
       if (permission == LocationPermission.deniedForever) {
         _showToast(
-          "Location permission permanently denied hai. Settings se enable karein.",
+          "Location permission permanently denied hai. "
+          "Settings se permission enable karein.",
         );
         return;
       }
 
+      // Geolocator 11.x ke liye correct syntax.
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
+        desiredAccuracy: LocationAccuracy.high,
       );
 
       await _getWeatherFromCoords(
@@ -272,10 +269,6 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
       }
     }
   }
-
-  // ------------------------------------------------------------
-  // WEATHER
-  // ------------------------------------------------------------
 
   Future<void> _getWeatherFromCoords(
     double lat,
@@ -367,10 +360,16 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
       case 53:
       case 55:
         return "DRIZZLE";
+      case 56:
+      case 57:
+        return "FREEZING DRIZZLE";
       case 61:
       case 63:
       case 65:
         return "RAIN";
+      case 66:
+      case 67:
+        return "FREEZING RAIN";
       case 71:
       case 73:
       case 75:
@@ -380,21 +379,52 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
       case 81:
       case 82:
         return "RAIN SHOWERS";
+      case 85:
+      case 86:
+        return "SNOW SHOWERS";
       case 95:
         return "THUNDERSTORM";
+      case 96:
+      case 99:
+        return "THUNDERSTORM WITH HAIL";
       default:
         return "UNKNOWN";
     }
   }
 
   IconData _getWeatherIcon(int code) {
-    if (code == 0) return Icons.wb_sunny;
-    if (code >= 1 && code <= 3) return Icons.cloud;
-    if (code >= 45 && code <= 48) return Icons.foggy;
-    if (code >= 51 && code <= 67) return Icons.grain;
-    if (code >= 71 && code <= 77) return Icons.ac_unit;
-    if (code >= 80 && code <= 82) return Icons.water_drop;
-    if (code >= 95) return Icons.thunderstorm;
+    if (code == 0) {
+      return Icons.wb_sunny;
+    }
+
+    if (code >= 1 && code <= 3) {
+      return Icons.cloud;
+    }
+
+    if (code >= 45 && code <= 48) {
+      return Icons.foggy;
+    }
+
+    if (code >= 51 && code <= 67) {
+      return Icons.grain;
+    }
+
+    if (code >= 71 && code <= 77) {
+      return Icons.ac_unit;
+    }
+
+    if (code >= 80 && code <= 82) {
+      return Icons.water_drop;
+    }
+
+    if (code >= 85 && code <= 86) {
+      return Icons.ac_unit;
+    }
+
+    if (code >= 95 && code <= 99) {
+      return Icons.thunderstorm;
+    }
+
     return Icons.wb_sunny;
   }
 
@@ -411,10 +441,6 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
       );
   }
 
-  // ------------------------------------------------------------
-  // UI
-  // ------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -430,23 +456,30 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                     child: TextField(
                       controller: _searchController,
                       textInputAction: TextInputAction.search,
-                      style: const TextStyle(color: Colors.white),
+                      style: const TextStyle(
+                        color: Colors.white,
+                      ),
                       decoration: InputDecoration(
                         hintText: "City search karein...",
                         hintStyle: TextStyle(
                           color: Colors.white.withOpacity(0.7),
                         ),
                         filled: true,
-                        fillColor: Colors.white.withOpacity(0.2),
+                        fillColor:
+                            Colors.white.withOpacity(0.2),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
+                          borderRadius:
+                              BorderRadius.circular(30),
                           borderSide: BorderSide.none,
                         ),
                         contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 20),
+                            const EdgeInsets.symmetric(
+                          horizontal: 20,
+                        ),
                       ),
                       onSubmitted: (value) {
                         final city = value.trim();
+
                         if (city.isNotEmpty) {
                           _fetchWeatherByCity(city);
                           _searchController.clear();
@@ -457,9 +490,14 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   const SizedBox(width: 5),
                   IconButton(
                     tooltip: "Search",
-                    icon: const Icon(Icons.search, color: Colors.white),
+                    icon: const Icon(
+                      Icons.search,
+                      color: Colors.white,
+                    ),
                     onPressed: () {
-                      final city = _searchController.text.trim();
+                      final city =
+                          _searchController.text.trim();
+
                       if (city.isNotEmpty) {
                         _fetchWeatherByCity(city);
                         _searchController.clear();
@@ -468,14 +506,19 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   ),
                   IconButton(
                     tooltip: "Current Location",
-                    icon: const Icon(Icons.my_location, color: Colors.white),
+                    icon: const Icon(
+                      Icons.my_location,
+                      color: Colors.white,
+                    ),
                     onPressed: isLoading
                         ? null
                         : _checkPermissionsAndFetchLocation,
                   ),
                 ],
               ),
+
               const SizedBox(height: 30),
+
               Center(
                 child: Column(
                   children: [
@@ -489,13 +532,17 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                         letterSpacing: 1.5,
                       ),
                     ),
+
                     const SizedBox(height: 10),
+
                     Icon(
                       _getWeatherIcon(weatherCode),
                       size: 70,
                       color: Colors.white,
                     ),
+
                     const SizedBox(height: 10),
+
                     Text(
                       '${temperature.toStringAsFixed(1)}°C',
                       style: const TextStyle(
@@ -504,6 +551,7 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                         color: Colors.white,
                       ),
                     ),
+
                     Text(
                       weatherDescription,
                       textAlign: TextAlign.center,
@@ -517,51 +565,69 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   ],
                 ),
               ),
+
               const SizedBox(height: 25),
+
               Container(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 15,
+                  horizontal: 20,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  mainAxisAlignment:
+                      MainAxisAlignment.spaceAround,
                   children: [
                     Flexible(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.water_drop,
-                              color: Colors.white, size: 20),
+                          const Icon(
+                            Icons.water_drop,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
                               'Humidity: $humidity%',
-                              overflow: TextOverflow.ellipsis,
+                              overflow:
+                                  TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w500,
+                                fontWeight:
+                                    FontWeight.w500,
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
+
                     const SizedBox(width: 15),
+
                     Flexible(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.air, color: Colors.white, size: 20),
+                          const Icon(
+                            Icons.air,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                           const SizedBox(width: 8),
                           Flexible(
                             child: Text(
                               'Wind: ${windSpeed.toStringAsFixed(1)} km/h',
-                              overflow: TextOverflow.ellipsis,
+                              overflow:
+                                  TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w500,
+                                fontWeight:
+                                    FontWeight.w500,
                               ),
                             ),
                           ),
@@ -571,7 +637,9 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   ],
                 ),
               ),
+
               const SizedBox(height: 30),
+
               const Text(
                 "TODAY'S LIVE FUEL RATES",
                 style: TextStyle(
@@ -581,9 +649,12 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   letterSpacing: 1.1,
                 ),
               ),
+
               const SizedBox(height: 15),
+
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: _fuelCard(
@@ -593,7 +664,9 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                       iconColor: Colors.redAccent,
                     ),
                   ),
+
                   const SizedBox(width: 15),
+
                   Expanded(
                     child: _fuelCard(
                       title: "DIESEL",
@@ -604,11 +677,14 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   ),
                 ],
               ),
+
               if (isLoading || isFuelLoading)
                 const Padding(
                   padding: EdgeInsets.only(top: 20),
                   child: Center(
-                    child: CircularProgressIndicator(color: Colors.white),
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                    ),
                   ),
                 ),
             ],
@@ -631,10 +707,12 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment:
+                MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 title,
@@ -643,10 +721,15 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
                   color: Colors.white,
                 ),
               ),
-              Icon(icon, color: iconColor),
+              Icon(
+                icon,
+                color: iconColor,
+              ),
             ],
           ),
+
           const SizedBox(height: 12),
+
           Text(
             "₹${price.toStringAsFixed(2)}",
             style: const TextStyle(
@@ -655,10 +738,15 @@ class _WeatherFuelScreenState extends State<WeatherFuelScreen> {
               color: Colors.white,
             ),
           ),
+
           const SizedBox(height: 4),
+
           const Text(
-            "Firebase City Rate",
-            style: TextStyle(fontSize: 12, color: Colors.white70),
+            "Standard City Rate",
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white70,
+            ),
           ),
         ],
       ),
