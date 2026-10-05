@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package0:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
@@ -10,7 +10,7 @@ void main() async {
   try {
     await Firebase.initializeApp();
   } catch (e) {
-    debugPrint("Firebase Init Error: $e");
+    debugPrint("Firebase Init Warning: $e");
   }
   runApp(const MyApp());
 }
@@ -22,7 +22,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Fuel & Weather',
+      title: 'Fuel & Weather Live',
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Roboto',
@@ -42,57 +42,79 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final String weatherApiKey = '42e264af50f9b2c516011c9467291294';
 
-  String selectedCity = 'Lucknow';
-  double rawTemp = 25.0;
-  String tempDisplay = '--°C';
-  String weatherCondition = 'Loading...';
-  String weatherDescription = 'Fetching data...';
-  String weatherIcon = '01d';
+  String currentCity = 'Lucknow';
+  double? currentTemp;
+  String weatherMain = 'Clear';
+  String weatherDesc = 'Loading mausam...';
   String petrolPrice = 'Fetching...';
   String dieselPrice = 'Fetching...';
   bool isLoading = false;
 
-  final TextEditingController _cityController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    fetchDataForCity(selectedCity);
+    _loadInitialData();
   }
 
-  void _showSnackBar(String message) {
+  Future<void> _loadInitialData() async {
+    await fetchByCityName(currentCity);
+  }
+
+  void _showNotification(String message) {
     if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        backgroundColor: Colors.black87,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
-  // Dynamic Background Gradient based on Temperature
-  List<Color> _getTemperatureGradient() {
-    if (rawTemp <= 15.0) {
-      // Cold / Snow
-      return [const Color(0xFF1E3C72), const Color(0xFF2A5298)];
-    } else if (rawTemp > 15.0 && rawTemp <= 30.0) {
-      // Pleasant / Mild
-      return [const Color(0xFF11998E), const Color(0xFF38EF7D)];
+  // Weather Dynamic Gradient Background Logic
+  List<Color> _getDynamicBackgroundColors() {
+    if (currentTemp == null) {
+      return [const Color(0xFF1E3C72), const Color(0xFF2A5298)]; // Default Blue
+    }
+
+    String cond = weatherMain.toLowerCase();
+
+    if (cond.contains('rain') || cond.contains('drizzle') || cond.contains('thunderstorm')) {
+      return [const Color(0xFF373B44), const Color(0xFF4286F4)]; // Rainy Storm Dark
+    }
+
+    if (currentTemp! >= 35) {
+      return [const Color(0xFFFF512F), const Color(0xFFDD2476)]; // Very Hot / Heatwave
+    } else if (currentTemp! >= 25) {
+      return [const Color(0xFFFF8008), const Color(0xFFFFC837)]; // Warm Sunny
+    } else if (currentTemp! <= 15) {
+      return [const Color(0xFF83A4D4), const Color(0xFFB6FBFF)]; // Cold Crisp
     } else {
-      // Warm / Hot
-      return [const Color(0xFFFF512F), const Color(0xFFDD2476)];
+      return [const Color(0xFF3A7BD5), const Color(0xFF3A6073)]; // Pleasant Balanced
     }
   }
 
-  // GPS Location Fetching
-  Future<void> fetchByCurrentLocation() async {
+  IconData _getWeatherIcon() {
+    String cond = weatherMain.toLowerCase();
+    if (cond.contains('cloud')) return Icons.cloud;
+    if (cond.contains('rain')) return Icons.thunderstorm;
+    if (cond.contains('clear')) return Icons.wb_sunny;
+    if (cond.contains('snow')) return Icons.ac_unit;
+    return Icons.wb_cloudy;
+  }
+
+  // Location / GPS Fetch Handler
+  Future<void> fetchByGPS() async {
     setState(() => isLoading = true);
 
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _showSnackBar('Kripya mobile ka GPS / Location ON karein.');
+        _showNotification('GPS Services OFF hain. Kripya Location ON karein.');
         setState(() => isLoading = false);
         return;
       }
@@ -101,81 +123,76 @@ class _HomeScreenState extends State<HomeScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          _showSnackBar('Location permission deny ho gayi.');
+          _showNotification('Location Permission Deny ki gayi hai.');
           setState(() => isLoading = false);
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        _showSnackBar('Settings me jaakar App Location permission Allow karein.');
+        _showNotification('Settings se Location Permission Allow karein.');
         setState(() => isLoading = false);
         return;
       }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 10),
+      Position pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
       );
 
       final url = Uri.parse(
-        'https://api.openweathermap.org/data/2.5/weather?lat=${position.latitude}&lon=${position.longitude}&units=metric&appid=$weatherApiKey',
+        '[https://api.openweathermap.org/data/2.5/weather?lat=$](https://api.openweathermap.org/data/2.5/weather?lat=$){pos.latitude}&lon=${pos.longitude}&units=metric&appid=$weatherApiKey',
       );
 
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        _updateWeatherData(data);
-        await _fetchLiveFuelPricesFromFirebase(selectedCity);
-        _showSnackBar('Current Location: $selectedCity');
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        _applyWeatherData(data);
+        _showNotification('GPS Location Detected: $currentCity');
       } else {
-        _showSnackBar('GPS Location weather data load nahi kar saka.');
+        _showNotification('GPS Location Weather Update Failed.');
       }
     } catch (e) {
-      _showSnackBar('GPS Fetching me problem aayi: $e');
+      _showNotification('Location Detect karne me error aaya.');
     } finally {
-      if (mounted) setState(() => isLoading = false);
+      setState(() => isLoading = false);
     }
   }
 
-  // Search by City Name
-  Future<void> fetchDataForCity(String cityName) async {
+  // City Search Handler
+  Future<void> fetchByCityName(String cityName) async {
     if (cityName.trim().isEmpty) return;
     setState(() => isLoading = true);
 
     try {
       final url = Uri.parse(
-        'https://api.openweathermap.org/data/2.5/weather?q=${cityName.trim()}&units=metric&appid=$weatherApiKey',
+        '[https://api.openweathermap.org/data/2.5/weather?q=$](https://api.openweathermap.org/data/2.5/weather?q=$){cityName.trim()}&units=metric&appid=$weatherApiKey',
       );
 
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        _updateWeatherData(data);
-        await _fetchLiveFuelPricesFromFirebase(selectedCity);
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        _applyWeatherData(data);
       } else {
-        _showSnackBar('City nahi mili! Sahi naam enter karein.');
+        _showNotification('City nahi mili! Kripya sahi naam enter karein.');
       }
     } catch (e) {
-      _showSnackBar('Network Connection Check Karein.');
+      _showNotification('Network Issue! Connection check karein.');
     } finally {
-      if (mounted) setState(() => isLoading = false);
+      setState(() => isLoading = false);
     }
   }
 
-  void _updateWeatherData(dynamic data) {
+  void _applyWeatherData(dynamic data) {
     setState(() {
-      selectedCity = data['name'] ?? 'Unknown';
-      rawTemp = (data['main']['temp'] as num).toDouble();
-      tempDisplay = '${rawTemp.round()}°C';
-      weatherCondition = data['weather'][0]['main'] ?? '--';
-      weatherDescription = data['weather'][0]['description'] ?? '';
-      weatherIcon = data['weather'][0]['icon'] ?? '01d';
+      currentCity = data['name'] ?? 'Unknown';
+      currentTemp = (data['main']['temp'] as num).toDouble();
+      weatherMain = data['weather'][0]['main'] ?? 'Clear';
+      weatherDesc = data['weather'][0]['description'] ?? 'Sunny';
     });
+    _fetchFuelPriceFromFirestore(currentCity);
   }
 
-  // Live Fuel Rates Fetching from Firestore
-  Future<void> _fetchLiveFuelPricesFromFirebase(String city) async {
+  Future<void> _fetchFuelPriceFromFirestore(String city) async {
     try {
       final doc = await FirebaseFirestore.instance
           .collection('fuel_rates')
@@ -185,13 +202,12 @@ class _HomeScreenState extends State<HomeScreen> {
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
         setState(() {
-          petrolPrice = '₹${data['petrol'] ?? '--'}';
-          dieselPrice = '₹${data['diesel'] ?? '--'}';
+          petrolPrice = '₹${data['petrol'] ?? 'N/A'}';
+          dieselPrice = '₹${data['diesel'] ?? 'N/A'}';
         });
       } else {
-        // Default Fallback
         setState(() {
-          petrolPrice = '₹96.72';
+          petrolPrice = '₹96.72'; // Fallback estimated rates if doc not created
           dieselPrice = '₹89.62';
         });
       }
@@ -205,87 +221,219 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bgColors = _getDynamicBackgroundColors();
+
     return Scaffold(
       body: AnimatedContainer(
         duration: const Duration(milliseconds: 800),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: _getTemperatureGradient(),
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
+            colors: bgColors,
           ),
         ),
         child: SafeArea(
           child: isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                )
+              ? const Center(child: CircularProgressIndicator(color: Colors.white))
               : RefreshIndicator(
-                  onRefresh: () => fetchDataForCity(selectedCity),
-                  color: Colors.white,
-                  backgroundColor: Colors.black26,
+                  color: Colors.indigo,
+                  onRefresh: () => fetchByCityName(currentCity),
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Search Bar Section
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.25),
-                            borderRadius: BorderRadius.circular(25),
-                            border: Border.all(color: Colors.white.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.search, color: Colors.white),
-                              const SizedBox(width: 8),
-                              Expanded(
+                        // Header Search & GPS
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
                                 child: TextField(
-                                  controller: _cityController,
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-                                  decoration: constPoori app ko ek dynamic, modern UI aur robust error handling ke saath rewrite kar dete hain. 
+                                  controller: _searchController,
+                                  style: const TextStyle(color: Colors.white),
+                                  decoration: InputDecoration(
+                                    hintText: 'City Search karein...',
+                                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                                    border: InputBorder.none,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    suffixIcon: IconButton(
+                                      icon: const Icon(Icons.search, color: Colors.white),
+                                      onPressed: () {
+                                        fetchByCityName(_searchController.text);
+                                        _searchController.clear();
+                                      },
+                                    ),
+                                  ),
+                                  onSubmitted: (val) {
+                                    fetchByCityName(val);
+                                    _searchController.clear();
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            InkWell(
+                              onTap: fetchByGPS,
+                              borderRadius: BorderRadius.circular(15),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.25),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: const Icon(Icons.my_location, color: Colors.white, size: 26),
+                              ),
+                            )
+                          ],
+                        ),
 
-Aapki zarooraton ke mutabiq naye features:
-1. **Dynamic Backgrounds:** Temperature aur mausam ke hisab se UI ka gradient aur background dynamic badlega (Jaise Heatwave, Cold/Pleasant, Rain/Storm, Clear Sky).
-2. **GPS & City Location Fetch:** `geolocator` plus Geocoding API se exact location/city fetch hogi.
-3. **Robust API & Firestore Fallback:** Weather API, OpenWeather Reverse Geocoding, aur Firebase Fuel Firestore syncing ka fail-safe handling.
-4. **Modern Glassmorphic UI:** Smooth cards, clean typography, custom weather icons, elevation shadows.
+                        const SizedBox(height: 30),
 
----
+                        // Location Title & Mausam Main Display
+                        Center(
+                          child: Column(
+                            children: [
+                              Text(
+                                currentCity.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.extrabold,
+                                  color: Colors.white,
+                                  letterSpacing: 2,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Icon(_getWeatherIcon(), size: 80, color: Colors.white),
+                              const SizedBox(height: 10),
+                              Text(
+                                currentTemp != null ? '${currentTemp!.toStringAsFixed(1)}°C' : '--°C',
+                                style: const TextStyle(
+                                  fontSize: 64,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                weatherDesc.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withOpacity(0.9),
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
 
-### File 1: `android/app/src/main/AndroidManifest.xml`
-Sabse pehle ye permissions aur themes verify/replace kar lijiye taaki GPS aur network request blocks na ho:
+                        const SizedBox(height: 40),
 
-```xml
-<manifest xmlns:android="[http://schemas.android.com/apk/res/android](http://schemas.android.com/apk/res/android)">
+                        // Fuel Rates Container
+                        const Text(
+                          'TODAY\'S FUEL RATES',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 15),
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+                        Row(
+                          children: [
+                            // Petrol Rate Glass Card
+                            Expanded(
+                              child: _buildFuelCard(
+                                title: 'PETROL',
+                                price: petrolPrice,
+                                icon: Icons.local_gas_station,
+                                color: Colors.orangeAccent,
+                              ),
+                            ),
+                            const SizedBox(width: 15),
+                            // Diesel Rate Glass Card
+                            Expanded(
+                              child: _buildFuelCard(
+                                title: 'DIESEL',
+                                price: dieselPrice,
+                                icon: Icons.oil_barrel,
+                                color: Colors.lightBlueAccent,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
 
-    <application
-        android:label="Fuel & Weather"
-        android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:launchMode="singleTop"
-            android:theme="@style/LaunchTheme"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-            android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2" />
-    </application>
-</manifest>
-                                  
+  Widget _buildFuelCard({
+    required String title,
+    required String price,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              Icon(icon, color: color, size: 28),
+            ],
+          ),
+          const SizedBox(height: 15),
+          Text(
+            price,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'Live Standard Rate',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
