@@ -7,7 +7,14 @@ import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  
+  // Safe Firebase Initialization to prevent White Screen
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint("Firebase Init Error: $e");
+  }
+
   runApp(const MyApp());
 }
 
