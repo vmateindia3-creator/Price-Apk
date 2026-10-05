@@ -1,4 +1,4 @@
-import 'package0:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
@@ -36,7 +36,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Weather API Key Added Here
   final String weatherApiKey = '42e264af50f9b2c516011c9467291294';
 
   String selectedCity = 'Lucknow';
